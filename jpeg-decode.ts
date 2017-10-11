@@ -43,12 +43,7 @@ function generateResult() : usize {
     let resultPosition : usize = malloc(resultSize);
     let arr : Uint8Array = new Uint8Array(resultSize);
     for(let i : i32 = 0; i < resultSize; i++) {
-<<<<<<< HEAD
         let currentByte : u8 = load<u8>(inputStartPointer+i);
-        currentByte++;
-        store<u8>(resultPosition+i, currentByte);
-=======
-        let currentByte : u8 = load<u8>(inBytes+i);
         //currentByte++;
         arr[i] = currentByte;
         //store<u8>(resultPosition+i, currentByte);
@@ -57,7 +52,6 @@ function generateResult() : usize {
     newArr = incArray(arr);
     for(let i : i32 = 0; i < resultSize; i++) {
         store<u8>(resultPosition + i, newArr[i]);
->>>>>>> 40b5fd29c439ac3f8536d9d450a523fc2fcc4217
     }
     return resultPosition;
 }
@@ -90,6 +84,74 @@ class Adobe {
     flags0 : u16;
     flags1 : u16;
     transformCode : u8;
+}
+
+class Frame {
+    extended : bool;
+    progressive : bool;
+    precision : u8;
+    scanLines : u16;
+    samplesPerLine : u16;
+    components: Uint8Array;
+    componentsOrder: Uint8Array;
+}
+
+export function parse(data : Uint8Array) : void {
+    let jfif : Jfif = new Jfif();
+    let adobe : Adobe = new Adobe();
+    let frame : Frame;
+    let offset : i32 = 0;
+    let length : i32 = inputSize;
+    let fileMarker: i16 = readUint16(data, offset);
+    let quantizationTables : i32[][];
+    offset += 2;
+    if(fileMarker != 0xFFD8) {
+        unreachable();
+    }
+
+    fileMarker = readUint16(data, offset);
+    while(fileMarker != 0xFFD9) {
+        let i : i32, j : i32, l : i32;
+        switch(fileMarker) {
+            case 0xFF00: break;
+            case 0xFFE0: // APP0 (Application Specific)
+            case 0xFFE1: // APP1
+            case 0xFFE2: // APP2
+            case 0xFFE3: // APP3
+            case 0xFFE4: // APP4
+            case 0xFFE5: // APP5
+            case 0xFFE6: // APP6
+            case 0xFFE7: // APP7
+            case 0xFFE8: // APP8
+            case 0xFFE9: // APP9
+            case 0xFFEA: // APP10
+            case 0xFFEB: // APP11
+            case 0xFFEC: // APP12
+            case 0xFFED: // APP13
+            case 0xFFEE: // APP14
+            case 0xFFEF: // APP15
+            case 0xFFFE: // COM (Comment)
+                let appData : Uint8Array = readDataBlock(data, offset);
+                offset += appData.length;
+
+                if (fileMarker === 0xFFE0) {
+                    if (appData[0] === 0x4A && appData[1] === 0x46 && appData[2] === 0x49 &&
+                    appData[3] === 0x46 && appData[4] === 0) { // 'JFIF\x00'
+                        jfif.majorVersion = appData[5];
+                        jfif.minorVersion = appData[6];
+                        jfif.densityUnits = appData[7];
+                        jfif.xDensity = (appData[8] << 8) | appData[9];
+                        jfif.yDensity = (appData[10] << 8) | appData[11];
+                        jfif.thumbWidth = appData[12];
+                        jfif.thumbHeight = appData[13];
+                        jfif.thumbData = sliceUint8Array(appData, 14, 3 * appData[12] * appData[13]);
+                    }
+                }
+            
+        }
+    }
+    fileMarker = readUint16(data, offset);
+    offset += 2;
 }
 
 export function getResultSize() : i32 {
