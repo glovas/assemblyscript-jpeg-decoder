@@ -1,6 +1,6 @@
 let inBytes: usize;
 let bytesSize: i32;
-
+let resultSize: i32 = 100;
 const dctZigZag : i32[] = [
     0,
     1,  8,
@@ -19,13 +19,26 @@ const dctZigZag : i32[] = [
     63
 ];
 
+function generateResult() : usize {
+    let resultPosition : usize = malloc(resultSize);
+    for(let i : i32 = 0; i < resultSize; i++) {
+        let currentByte : u8 = load<u8>(inBytes+i);
+        currentByte++;
+        store<u8>(resultPosition+i, currentByte);
+    }
+    return resultPosition;
+}
+
+export function getResultSize() : i32 {
+    return resultSize;
+}
+
 export function getInOffset(size: i32) : usize {
     bytesSize = size;
     inBytes = malloc(size);
     return inBytes;
 }
 
-export function jpeg_decode(): u8 {
-    let byteArray : u8 = load<u8>(inBytes+1);
-    return byteArray;
+export function jpeg_decode() : usize {
+    return generateResult();
 }

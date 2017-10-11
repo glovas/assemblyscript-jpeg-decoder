@@ -1,7 +1,10 @@
 <html>
     <body>
       <script>
-        function fetchAndInstantiateWasm (url, imports) {
+        let mem, wasmInstance;
+
+
+        function fetchAndInstantiateWasm (imports) {
             return fetch('jpeg-decode.wasm').then(response =>
                 response.arrayBuffer()
             )
@@ -9,32 +12,38 @@
             .then(module =>
             WebAssembly.instantiate(module, imports || {})
             )
-            .then(instance => instance.exports);
+            .then(instance => instance.exports)
+            .then(instance => {
+                mem = instance.memory;
+                wasmInstance = instance;
+            });
         }
         
-        let mem, wasmInstance;
         function writeBytes(byteArray, offset) {
-            console.log('Offset:' + offset);
+            console.log('Write bytes to offset: ',offset);
             const outBuf = new Uint8Array(mem.buffer, offset, byteArray.length);
-            for (let i = 0; i < 2; i++) {
-                console.log(byteArray[i]);
+            for (let i = 0; i < byteArray.length; i++) {
                 outBuf[i] = byteArray[i];
             }
         }
-        fetchAndInstantiateWasm('jpeg-decode.wasm',{
-            env: {
-              consoleLog (offset, len) {
-                const strBuf = new Uint8Array(mem.buffer, offset, len);
-                console.log(new TextDecoder().decode(strBuf));
-              }
+
+        function readBytes(offset, length) {
+            console.log('Read bytes from offset: ', offset);
+            const outBuf = new Uint8Array(mem.buffer, offset, length);
+            let result = new Uint8Array(length);
+            for (let i = 0; i < outBuf.length; i++) {
+                result[i] = outBuf[i];
             }
-        })
-        .then(instance => {
-            mem = instance.memory;
-            wasmInstance = instance;
-        });
+            return result;
+        }
 
-
+        function convertBytesWithWASM(jpegBytes) {
+            console.log('Convert bytes: ', jpegBytes);
+            writeBytes(jpegBytes, wasmInstance.getInOffset(jpegBytes.length));
+            let resultPointer = wasmInstance.jpeg_decode();
+            let resultSize = wasmInstance.getResultSize();
+            console.log('Result bytes: ', readBytes(resultPointer, resultSize));
+        }
 
         function test() {
             var xhr = new XMLHttpRequest();
@@ -44,17 +53,16 @@
                 var fr = new FileReader();
                 
                 fr.onload = function(){
-                    let arrayBuffer = this.result;
-                    var arr = new Uint8Array(arrayBuffer);
-                    console.log(arr);
-                    writeBytes(arr, wasmInstance.getInOffset(1000));
-                    console.log(wasmInstance.jpeg_decode());
+                    let arr = new Uint8Array(this.result);
+                    convertBytesWithWASM(arr);
                 };
                 
                 fr.readAsArrayBuffer(xhr.response);
             }
             xhr.send();
         }
+
+        fetchAndInstantiateWasm();
       </script>
     </body>
 </html>
