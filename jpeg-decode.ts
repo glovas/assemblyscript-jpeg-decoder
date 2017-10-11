@@ -21,10 +21,17 @@ const dctZigZag : i32[] = [
 
 function generateResult() : usize {
     let resultPosition : usize = malloc(resultSize);
+    let arr : Uint8Array = new Uint8Array(resultSize);
     for(let i : i32 = 0; i < resultSize; i++) {
         let currentByte : u8 = load<u8>(inBytes+i);
-        currentByte++;
-        store<u8>(resultPosition+i, currentByte);
+        //currentByte++;
+        arr[i] = currentByte;
+        //store<u8>(resultPosition+i, currentByte);
+    }
+    let newArr : Uint8Array = new Uint8Array(resultSize);
+    newArr = incArray(arr);
+    for(let i : i32 = 0; i < resultSize; i++) {
+        store<u8>(resultPosition + i, newArr[i]);
     }
     return resultPosition;
 }
@@ -41,4 +48,12 @@ export function getInOffset(size: i32) : usize {
 
 export function jpeg_decode() : usize {
     return generateResult();
+}
+
+function incArray(arr: Uint8Array) : Uint8Array {
+    let newArr : Uint8Array = new Uint8Array(resultSize);
+    for(let i: i8 = 0; i < arr.length; i++) {
+        newArr[i] = arr[i] + 1;
+    }
+    return newArr;
 }
