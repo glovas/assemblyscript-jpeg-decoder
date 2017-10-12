@@ -40,6 +40,9 @@ class FrameComponent {
     componentId : u8;
     h : u8;
     v : u8;
+    blocks : Int32Array;
+    blocksPerLine : f32;
+    blocksPerColumn : f32;
     quantizationIdx : u8;
     huffmanTableDC : ChainedListU8;
     huffmanTableAC : ChainedListU8;
@@ -54,6 +57,8 @@ class Frame {
     scanLines : u16;
     maxH : f32;
     maxV : f32;
+    mcusPerLine : f32;
+    mcusPerColumn : f32;
     samplesPerLine : u16;
     components : FrameComponent;
     prev: Frame | null = null;
@@ -136,7 +141,37 @@ export function readDataBlock(data : Uint8Array, offset : i32) : Uint8Array {
 
 
 function prepareComponents(frame : Frame) : void {
-    // TODO Implement
+    let maxH : f32 = 0;
+    let maxV : f32 = 0;
+    let currentCP : FrameComponent | null = frame.components;
+    while (currentCP != null) {
+        if (maxH < currentCP.h) {
+            maxH = currentCP.h;
+        }
+        if (maxV < currentCP.v) {
+           maxV = currentCP.v; 
+        }
+        currentCP = currentCP.prev;
+    }
+    let mcusPerLine : f32 = ceilf(frame.samplesPerLine / 8 / maxH);
+    let mcusPerColumn : f32 = ceilf(frame.scanLines / 8 / maxV);
+
+    currentCP = frame.components;
+    while (currentCP != null) {
+        
+        let blocksPerLine : f32 = ceilf(ceilf(frame.samplesPerLine / 8) * currentCP.h / maxH);
+        let blocksPerColumn : f32 = ceilf(ceilf(frame.scanLines  / 8) * currentCP.v / maxV);
+        let blocksPerLineForMcu : i32 = (mcusPerLine as i32) * (currentCP.h as i32);
+        let blocksPerColumnForMcu : i32 = (mcusPerColumn as i32) * (currentCP.v as i32);
+        currentCP.blocksPerLine = blocksPerLine;
+        currentCP.blocksPerColumn = blocksPerColumn;
+        currentCP.blocks = new Int32Array(64*blocksPerLineForMcu*blocksPerColumnForMcu);
+        currentCP = currentCP.prev;
+    }
+    frame.maxH = maxH;
+    frame.maxV = maxV;
+    frame.mcusPerLine = mcusPerLine;
+    frame.mcusPerColumn = mcusPerColumn;
 }
 
 function buildHuffmanTable(codeLengths : Uint8Array, values : Uint8Array) : Uint8Array {
@@ -180,9 +215,9 @@ export function parse(data : Uint8Array) : void {
     let resetInterval : u16 = 0;
     let length : i32 = inputSize;
     let fileMarker: i16 = readUint16(data, offset);
-    let quantizationTables : ChainedListInt32 = new ChainedListInt32();
-    let huffmanTablesAC : ChainedListU8 = new ChainedListU8();
-    let huffmanTablesDC : ChainedListU8 = new ChainedListU8();
+    let quantizationTables : ChainedListInt32 | null = null;
+    let huffmanTablesAC : ChainedListU8 | null = null;
+    let huffmanTablesDC : ChainedListU8 | null = null;
     offset += 2;
     if(fileMarker != 0xFFD8) {
         unreachable();
