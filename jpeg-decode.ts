@@ -41,12 +41,13 @@ class FrameComponent {
     h : u8;
     v : u8;
     blocks : Int32Array;
-    blocksPerLine : f32;
-    blocksPerColumn : f32;
+    blocksPerLine : i32;
+    blocksPerColumn : i32;
     quantizationIdx : u8;
     huffmanTableDC : ChainedListU8;
     huffmanTableAC : ChainedListU8;
     quantizationTable: Int32Array;
+    pred : i32;
     prev : FrameComponent | null = null;
 }
 
@@ -57,8 +58,8 @@ class Frame {
     scanLines : u16;
     maxH : f32;
     maxV : f32;
-    mcusPerLine : f32;
-    mcusPerColumn : f32;
+    mcusPerLine : i32;
+    mcusPerColumn : i32;
     samplesPerLine : u16;
     components : FrameComponent;
     prev: Frame | null = null;
@@ -169,15 +170,15 @@ function prepareComponents(frame : Frame) : void {
         let blocksPerColumn : f32 = ceilf(ceilf(frame.scanLines  / 8) * currentCP.v / maxV);
         let blocksPerLineForMcu : i32 = (mcusPerLine as i32) * (currentCP.h as i32);
         let blocksPerColumnForMcu : i32 = (mcusPerColumn as i32) * (currentCP.v as i32);
-        currentCP.blocksPerLine = blocksPerLine;
-        currentCP.blocksPerColumn = blocksPerColumn;
+        currentCP.blocksPerLine = blocksPerLine as i32;
+        currentCP.blocksPerColumn = blocksPerColumn as i32;
         currentCP.blocks = new Int32Array(64*blocksPerLineForMcu*blocksPerColumnForMcu);
         currentCP = currentCP.prev;
     }
     frame.maxH = maxH;
     frame.maxV = maxV;
-    frame.mcusPerLine = mcusPerLine;
-    frame.mcusPerColumn = mcusPerColumn;
+    frame.mcusPerLine = mcusPerLine as i32;
+    frame.mcusPerColumn = mcusPerColumn as i32;
 }
 
 function buildHuffmanTable(codeLengths : Uint8Array, values : Uint8Array) : Uint8Array {
@@ -261,11 +262,107 @@ function findInI32ChainedListById(list : ChainedListInt32, id : i32) : ChainedLi
     return current;
 }
 
+function decodeBlock(component : FrameComponent, decodeFn : string, mcu : i32) : void {
+    // TODO implement
+}
+
+function decodeMcu(component : FrameComponent, decodeFn : string, mcu : i32, j : i32, k : i32) : void {
+
+}
+
 function decodeScan(data : Uint8Array, offset : i32, frame : Frame, components : FrameComponent, 
-    resetInterval : u16, spectralStart : u8, spectralEnd : u8,
+    resetInterval : i32, spectralStart : u8, spectralEnd : u8,
     successivePrev : i32, successive : i32) : i32 {
-    // TODO Implement
-    return 0;
+    let precision : u8 = frame.precision;
+    let samplesPerLine : u16 = frame.samplesPerLine;
+    let scanLines : u16 = frame.scanLines;
+    let mcusPerLine : i32 = frame.mcusPerLine;
+    let progressive : bool = frame.progressive;
+    let maxH : f32 = frame.maxH;
+    let maxV : f32 = frame.maxV;
+    let startOffset : i32 = offset;
+    let bitsData : i32 = 0;
+    let bitsCount : i32 = 0;
+    let eobrun : i32 = 0;
+    let successiveACState : i32 = 0;
+    let successiveACNextValue : i32 = 0;
+    let component : FrameComponent | null, i : i32, j : i32, k : i32, n : i32;
+    let decodeFn : string;
+    let h : u8, v : u8;
+    let mcu : i32 = 0, marker : i32;
+    let mcuExpected : i32;
+
+    if (progressive) {
+      if (spectralStart == 0)
+        decodeFn = successivePrev == 0 ? 'decodeDCFirst' : 'decodeDCSuccessive';
+      else
+        decodeFn = successivePrev == 0 ? 'decodeACFirst' : 'decodeACSuccessive';
+    } else {
+      decodeFn = 'decodeBaseline';
+    }
+
+    if (components.prev == null) {
+      mcuExpected = components.blocksPerLine * components.blocksPerColumn;
+    } else {
+      mcuExpected = mcusPerLine * frame.mcusPerColumn;
+    }
+
+    if (!resetInterval) {
+        resetInterval = mcuExpected;
+    }
+
+    while (mcu < mcuExpected) {
+      // reset interval stuff
+        let currentComponent : FrameComponent | null = components;
+        while (currentComponent != null) {
+            currentComponent.pred = 0;
+            currentComponent = currentComponent.prev;
+        }
+        eobrun = 0;
+
+        if (components.prev != null) {
+            component = components;
+            for (n = 0; n < resetInterval; n++) {
+                decodeBlock(component, decodeFn, mcu);
+                mcu++;
+            }
+        } else {
+            for (n = 0; n < resetInterval; n++) {
+                component = components;
+                while (component != null) {
+                    h = component.h;
+                    v = component.v;
+                    for (j = 0; j < v; j++) {
+                        for (k = 0; k < h; k++) {
+                            decodeMcu(component, decodeFn, mcu, j, k);
+                        }
+                    }
+                    component = component.prev;
+                }
+                mcu++;
+
+                // If we've reached our expected MCU's, stop decoding
+                if (mcu == mcuExpected) {
+                    break;
+                }
+            }
+        }
+
+        // find marker
+        bitsCount = 0;
+        marker = (data[offset] << 8) | data[offset + 1];
+        if (marker < 0xFF00) {
+            unreachable();
+        }
+
+        if (marker >= 0xFFD0 && marker <= 0xFFD7) { // RSTx
+            offset += 2;
+        }
+        else
+            break;
+    }
+
+    return offset - startOffset;
 }
 
 function buildComponentData(frame : Frame, component : FrameComponent) : Uint8Array {
