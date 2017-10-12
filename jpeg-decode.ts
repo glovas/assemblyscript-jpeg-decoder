@@ -1,6 +1,73 @@
+
+class Jfif {
+    majorVersion: u8;
+    minorVersion: u8;
+    densityUnits: u8;
+    xDensity: u16;
+    yDensity: u16;
+    thumbWidth: u8;
+    thumbHeight: u8;
+    thumbData: Uint8Array;
+}
+
+class Adobe {
+    version : u8;
+    flags0 : u16;
+    flags1 : u16;
+    transformCode : u8;
+}
+
+class ChainedListInt32 {
+    id: u32;
+    data: Int32Array;
+    prev: ChainedListInt32 | null = null;
+}
+
+class ChainedListU8 {
+    id: u32;
+    data: Uint8Array;
+    prev: ChainedListU8 | null = null;
+}
+
+class ImageComponent {
+    lines: Uint8Array;
+    scaleX: f32;
+    scaleY: f32;
+    prev: ImageComponent | null = null;
+}
+
+class FrameComponent {
+    componentId : u8;
+    h : u8;
+    v : u8;
+    quantizationIdx : u8;
+    huffmanTableDC : ChainedListU8;
+    huffmanTableAC : ChainedListU8;
+    quantizationTable: Int32Array;
+    prev : FrameComponent | null = null;
+}
+
+class Frame {
+    extended : bool;
+    progressive : bool;
+    precision : u8;
+    scanLines : u16;
+    maxH : f32;
+    maxV : f32;
+    samplesPerLine : u16;
+    components : FrameComponent;
+    prev: Frame | null = null;
+}
+
 let inputStartPointer: usize;
 let inputSize: i32;
 let resultSize: i32 = 100;
+let imageWidth : u16;
+let imageHeight : u16;
+let imageJfif : Jfif;
+let imageAdobe : Adobe;
+let imageComponents : ImageComponent | null = null;
+
 const dctZigZag : i32[] = [
     0,
     1,  8,
@@ -68,42 +135,54 @@ export function readDataBlock(data : Uint8Array, offset : i32) : Uint8Array {
 } // !!!! increment offset with lenght after call
 
 
-class Jfif {
-    majorVersion: u8;
-    minorVersion: u8;
-    densityUnits: u8;
-    xDensity: u16;
-    yDensity: u16;
-    thumbWidth: u8;
-    thumbHeight: u8;
-    thumbData: Uint8Array;
+function prepareComponents(frame : Frame) : void {
+    // TODO Implement
 }
 
-class Adobe {
-    version : u8;
-    flags0 : u16;
-    flags1 : u16;
-    transformCode : u8;
+function buildHuffmanTable(codeLengths : Uint8Array, values : Uint8Array) : Uint8Array {
+    // TODO Implement
+    return new Uint8Array(1);
 }
 
-class Frame {
-    extended : bool;
-    progressive : bool;
-    precision : u8;
-    scanLines : u16;
-    samplesPerLine : u16;
-    components: Uint8Array;
-    componentsOrder: Uint8Array;
+function getFrameComponentAtIndex(componentList : FrameComponent, index : u8) : FrameComponent {
+    // TODO Implement
+    return componentList;
+}
+
+function findInU8ChainedListById(list : ChainedListU8, id : i32) : ChainedListU8 {
+    // TODO Implement
+    return list;
+}
+
+function findInI32ChainedListById(list : ChainedListInt32, id : i32) : ChainedListInt32 {
+    // TODO Implement
+    return list;
+}
+
+function decodeScan(data : Uint8Array, offset : i32, frame : Frame, components : FrameComponent, 
+    resetInterval : u16, spectralStart : u8, spectralEnd : u8,
+    successivePrev : i32, successive : i32) : i32 {
+    // TODO Implement
+    return 0;
+}
+
+function buildComponentData(frame : Frame, component : FrameComponent) : Uint8Array {
+    // TODO Implement
+    return new Uint8Array(1);
 }
 
 export function parse(data : Uint8Array) : void {
     let jfif : Jfif = new Jfif();
     let adobe : Adobe = new Adobe();
-    let frame : Frame;
+    let frame : Frame = new Frame();
+    let frames : Frame | null = null;
     let offset : i32 = 0;
+    let resetInterval : u16 = 0;
     let length : i32 = inputSize;
     let fileMarker: i16 = readUint16(data, offset);
-    let quantizationTables : i32[][];
+    let quantizationTables : ChainedListInt32 = new ChainedListInt32();
+    let huffmanTablesAC : ChainedListU8 = new ChainedListU8();
+    let huffmanTablesDC : ChainedListU8 = new ChainedListU8();
     offset += 2;
     if(fileMarker != 0xFFD8) {
         unreachable();
@@ -134,9 +213,9 @@ export function parse(data : Uint8Array) : void {
                 let appData : Uint8Array = readDataBlock(data, offset);
                 offset += appData.length;
 
-                if (fileMarker === 0xFFE0) {
-                    if (appData[0] === 0x4A && appData[1] === 0x46 && appData[2] === 0x49 &&
-                    appData[3] === 0x46 && appData[4] === 0) { // 'JFIF\x00'
+                if (fileMarker == 0xFFE0) {
+                    if (appData[0] == 0x4A && appData[1] == 0x46 && appData[2] == 0x49 &&
+                    appData[3] == 0x46 && appData[4] == 0) { // 'JFIF\x00'
                         jfif.majorVersion = appData[5];
                         jfif.minorVersion = appData[6];
                         jfif.densityUnits = appData[7];
@@ -147,11 +226,200 @@ export function parse(data : Uint8Array) : void {
                         jfif.thumbData = sliceUint8Array(appData, 14, 3 * appData[12] * appData[13]);
                     }
                 }
-            
+                // TODO APP1 - Exif
+                if (fileMarker == 0xFFEE) {
+                    if (appData[0] == 0x41 && appData[1] == 0x64 && appData[2] == 0x6F &&
+                    appData[3] == 0x62 && appData[4] == 0x65 && appData[5] == 0) { // 'Adobe\x00'
+                        adobe.version = appData[6];
+                        adobe.flags0 = (appData[7] << 8) | appData[8];
+                        adobe.flags1 = (appData[9] << 8) | appData[10];
+                        adobe.transformCode = appData[11];
+                    }
+                }
+                break;
+  
+            case 0xFFDB: // DQT (Define Quantization Tables)
+                let quantizationTablesLength : u16 = readUint16(data, offset);
+                offset += 2;
+                let quantizationTablesEnd : u32 = quantizationTablesLength + offset - 2;
+                while (offset < quantizationTablesEnd) {
+                    let quantizationTableSpec : u8 = data[offset];
+                    offset++;
+                    let tableData : Int32Array = new Int32Array(64);
+                    if ((quantizationTableSpec >> 4) == 0) { // 8 bit values
+                    for (j = 0; j < 64; j++) {
+                        let z : i32 = dctZigZag[j];
+                        tableData[z] = data[offset];
+                        offset++;
+                    }
+                    } else if ((quantizationTableSpec >> 4) == 1) { //16 bit
+                    for (j = 0; j < 64; j++) {
+                        let z : i32 = dctZigZag[j];
+                        tableData[z] = readUint16(data, offset);
+                        offset += 2;
+                    }
+                    } else {
+                        unreachable();
+                    }
+                    let table : ChainedListInt32 = new ChainedListInt32();
+                    table.data = tableData;
+                    table.id = quantizationTableSpec & 15;
+                    table.prev = quantizationTables;
+                    quantizationTables = table; 
+                }
+                break;
+  
+            case 0xFFC0: // SOF0 (Start of Frame, Baseline DCT)
+            case 0xFFC1: // SOF1 (Start of Frame, Extended DCT)
+            case 0xFFC2: // SOF2 (Start of Frame, Progressive DCT)
+                readUint16(data, offset); // skip data length
+                offset += 2;
+                frame = new Frame();
+                frame.extended = (fileMarker == 0xFFC1);
+                frame.progressive = (fileMarker == 0xFFC2);
+                frame.precision = data[offset];
+                offset++;
+                frame.scanLines = readUint16(data, offset);
+                offset += 2;
+                frame.samplesPerLine = readUint16(data, offset);
+                offset += 2;
+
+                let componentsCount : u8 = data[offset++], componentId : u8;
+                frame.components = new FrameComponent();
+                for (i = 0; i < componentsCount; i++) {
+                    componentId = data[offset];
+                    let h : u8 = data[offset + 1] >> 4;
+                    let v : u8 = data[offset + 1] & 15;
+                    let qId : u8 = data[offset + 2];
+
+                    let fc : FrameComponent = new FrameComponent();
+                    fc.h = h;
+                    fc.v = v;
+                    fc.quantizationIdx = qId;
+                    fc.componentId = componentId;
+                    fc.prev = frame.components;
+                
+                    frame.components = fc;
+                    offset += 3;
+                }
+                prepareComponents(frame);
+                if(frames != null) {
+                    frame.prev = frames;
+                }
+                frames = frame;
+                break;
+            case 0xFFC4: // DHT (Define Huffman Tables)
+                let huffmanLength : u16 = readUint16(data, offset);
+                offset += 2;
+                for (i = 2; i < huffmanLength;) {
+                    let huffmanTableSpec : u8 = data[offset];
+                    offset++;
+                    let codeLengths : Uint8Array = new Uint8Array(16);
+                    let codeLengthSum : i32 = 0;
+                    for (j = 0; j < 16; j++) {
+                        codeLengths[j] = data[offset];
+                        codeLengthSum += codeLengths[j];
+                        offset++;
+                    }
+                    let huffmanValues : Uint8Array = new Uint8Array(codeLengthSum);
+                    for (j = 0; j < codeLengthSum; j++) {
+                        huffmanValues[j] = data[offset];
+                        offset++;
+                    }
+                    i += 17 + codeLengthSum;
+        
+                    let huffmanTable : Uint8Array = buildHuffmanTable(codeLengths, huffmanValues);
+                    let huffmanChainItem : ChainedListU8 = new ChainedListU8();
+                    huffmanChainItem.data = huffmanTable;
+                    if((huffmanTableSpec >> 4) == 0){
+                        huffmanChainItem.prev = huffmanTablesDC;
+                        huffmanChainItem.id = huffmanTableSpec & 15;
+                        huffmanTablesDC = huffmanChainItem;
+                    }
+                    else {                        
+                        huffmanChainItem.prev = huffmanTablesAC;
+                        huffmanChainItem.id = huffmanTableSpec & 15;
+                        huffmanTablesAC = huffmanChainItem;
+                    }
+                }
+                break;
+            case 0xFFDD: // DRI (Define Restart Interval)
+                readUint16(data, offset); // skip data length
+                offset += 2;
+                resetInterval = readUint16(data, offset);
+                offset += 2;
+                break;
+            case 0xFFDA: // SOS (Start of Scan)
+                let scanLength : u16 = readUint16(data, offset);
+                offset += 2;
+                let selectorsCount : u8 = data[offset];
+                offset++;
+                for (i = 0; i < selectorsCount; i++) {
+                    let component : FrameComponent = getFrameComponentAtIndex(frame.components, data[offset]);
+                    offset++;
+                    let tableSpec : u8 = data[offset++];
+                    component.huffmanTableDC = findInU8ChainedListById(huffmanTablesDC, tableSpec >> 4);
+                    component.huffmanTableAC = findInU8ChainedListById(huffmanTablesAC, tableSpec & 15);
+                }
+                let spectralStart : u8 = data[offset];
+                offset++;
+                let spectralEnd : u8 = data[offset];
+                offset++;
+                let successiveApproximation : u8 = data[offset];
+                offset++;
+                let processed : i32 = decodeScan(data, offset,
+                  frame, frame.components, resetInterval,
+                  spectralStart, spectralEnd,
+                  successiveApproximation >> 4, successiveApproximation & 15);
+               
+                  offset += processed;
+                break;
+            default:
+                if (data[offset - 3] == 0xFF &&
+                    data[offset - 2] >= 0xC0 && data[offset - 2] <= 0xFE) {
+                  // could be incorrect encoding -- last 0xFF byte of the previous
+                  // block was eaten by the encoder
+                  offset -= 3;
+                  break;
+                }
+                unreachable();
         }
+        fileMarker = readUint16(data, offset);
+        offset += 2;
     }
-    fileMarker = readUint16(data, offset);
-    offset += 2;
+    if(frames == null) {
+        unreachable();
+    }
+    // set each frame's components quantization table
+    let currentFrame : Frame | null = frames;
+    while (currentFrame != null) {
+        let cp : FrameComponent = currentFrame.components;
+        let currentCP : FrameComponent | null = cp;
+        while (currentCP != null) {
+            let quantizationTable : ChainedListInt32 = findInI32ChainedListById(quantizationTables, currentCP.quantizationIdx);
+            currentCP.quantizationTable = quantizationTable.data;
+            currentCP = currentCP.prev;
+        }
+        currentFrame = currentFrame.prev;
+    }
+
+    imageWidth = frame.samplesPerLine;
+    imageHeight = frame.scanLines;
+    imageJfif = jfif;
+    imageAdobe = adobe;
+
+    let currentCP : FrameComponent | null = frame.components;
+    while (currentCP != null) {
+        let newComponent : ImageComponent = new ImageComponent();
+        newComponent.scaleX = currentCP.h / frame.maxH;
+        newComponent.scaleY = currentCP.v / frame.maxV;
+        newComponent.lines = buildComponentData(frame, currentCP);
+        if(imageComponents != null) {
+            newComponent.prev = imageComponents;
+        }
+        imageComponents = newComponent;
+        currentCP = currentCP.prev;
+    }
 }
 
 export function getResultSize() : i32 {

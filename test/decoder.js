@@ -666,6 +666,7 @@ var JpegImage = (function jpegImage() {
                 } else
                   throw new Error("DQT: invalid table spec");
                 quantizationTables[quantizationTableSpec & 15] = tableData;
+                console.log(quantizationTableSpec & 15);
               }
               break;
   
