@@ -64,6 +64,12 @@ class Frame {
     prev: Frame | null = null;
 }
 
+class HuffmanTableChain {
+    prev : HuffmanTableChain | null = null;
+    children : Uint8Array = new Uint8Array(255);
+    index : i32 = 0;
+}
+
 let inputStartPointer: usize;
 let inputSize: i32;
 let resultSize: i32 = 100;
@@ -175,23 +181,84 @@ function prepareComponents(frame : Frame) : void {
 }
 
 function buildHuffmanTable(codeLengths : Uint8Array, values : Uint8Array) : Uint8Array {
-    // TODO Implement
-    return new Uint8Array(1);
+    let k : u16 = 0, i : u16, j : u16; 
+    let length : u16 = 16;
+    while (length > 0 && !codeLengths[length - 1]) {
+        length--;
+    }
+
+    let children : Uint8Array
+      
+    let code : HuffmanTableChain | null = new HuffmanTableChain();
+    let p : HuffmanTableChain = code; 
+    let q : HuffmanTableChain;
+    let codeLength : u8 = 1;
+    for (i = 0; i < length; i++) {
+        for (j = 0; j < codeLengths[i]; j++) {
+            p = code;
+            if(code.prev != null){
+                code = code.prev;
+            }
+            codeLength--;
+            p.prev = null;
+            p.children[p.index] = values[k];
+            while (p.index > 0) {
+                p = code;
+                if(code.prev != null){
+                    code = code.prev;
+                }
+                codeLength--;
+            }
+            p.index += 1;
+            p.prev = code;
+            code = p;
+            codeLength++;
+            while (codeLength <= i) {
+                q = new HuffmanTableChain();
+                q.prev = code;
+                code = q;
+                p.children[p.index] = 0; // possible wrong value
+                p = q;
+                codeLength++;
+            }
+            k++;
+        }
+        if (i + 1 < length) {
+            // p here points to last code
+            q = new HuffmanTableChain();
+            q.prev = code;
+            code = q;
+            codeLength++;
+            p.children[p.index] = 0; // possible wrong value
+            p = q;
+        }
+    }
+    return code.children;
 }
 
-function getFrameComponentAtIndex(componentList : FrameComponent, index : u8) : FrameComponent {
-    // TODO Implement
-    return componentList;
+function getFrameComponentAtIndex(list : FrameComponent, index : u8) : FrameComponent | null {
+    let current : FrameComponent | null = list;
+    let i : u16 = 0;
+    while(current != null && index > i) {
+        current = current.prev;    
+    }
+    return current;
 }
 
-function findInU8ChainedListById(list : ChainedListU8, id : i32) : ChainedListU8 {
-    // TODO Implement
-    return list;
+function findInU8ChainedListById(list : ChainedListU8, id : i32) : ChainedListU8 | null {
+    let current : ChainedListU8 | null = list;
+    while(current != null && current.id != id) {
+        current = current.prev;    
+    }
+    return current;
 }
 
-function findInI32ChainedListById(list : ChainedListInt32, id : i32) : ChainedListInt32 {
-    // TODO Implement
-    return list;
+function findInI32ChainedListById(list : ChainedListInt32, id : i32) : ChainedListInt32 | null {
+    let current : ChainedListInt32 | null = list;
+    while(current != null && current.id != id) {
+        current = current.prev;    
+    }
+    return current;
 }
 
 function decodeScan(data : Uint8Array, offset : i32, frame : Frame, components : FrameComponent, 
