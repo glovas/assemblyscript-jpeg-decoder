@@ -262,12 +262,70 @@ function findInI32ChainedListById(list : ChainedListInt32, id : i32) : ChainedLi
     return current;
 }
 
-function decodeBlock(component : FrameComponent, decodeFn : string, mcu : i32) : void {
-    // TODO implement
+function decodeACFirst(component : FrameComponent, zz : i32) : void {
 }
 
-function decodeMcu(component : FrameComponent, decodeFn : string, mcu : i32, j : i32, k : i32) : void {
+function decodeACSuccessive(component : FrameComponent, zz : i32) : void {
+}
 
+function decodeDCFirst(component : FrameComponent, zz : i32) : void {
+}
+
+function decodeDCSuccessive(component : FrameComponent, zz : i32) : void {
+}
+
+function decodeBaseline(component : FrameComponent, zz : i32) : void {
+}
+
+
+function decodeBlock(component : FrameComponent, decodeFn : string, mcu : i32) : void {
+    let blockRow : i32 = (mcu / component.blocksPerLine) | 0;
+    let blockCol : i32 = mcu % component.blocksPerLine;
+    let blockIndex : i32 = 64*blockRow + blockCol;
+    switch(decodeFn) {
+        case 'decodeACFirst':
+            decodeACFirst(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeACSuccessive':
+            decodeACSuccessive(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeDCFirst':
+            decodeDCFirst(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeDCSuccessive':
+            decodeDCSuccessive(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeBaseline':
+            decodeBaseline(component, component.blocks[blockIndex]);
+        break;
+    }
+}
+
+function decodeMcu(component : FrameComponent, decodeFn : string, mcu : i32, col : i32, row : i32,
+    mcusPerLine : i32) : void {
+    let mcuRow : i32 = (mcu / mcusPerLine) | 0;
+    let mcuCol : i32 = mcu % mcusPerLine;
+    let blockRow : i32 = mcuRow * component.v + row;
+    let blockCol : i32 = mcuCol * component.h + col;
+
+    let blockIndex : i32 = 64*blockRow + blockCol;
+    switch(decodeFn) {
+        case 'decodeACFirst':
+            decodeACFirst(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeACSuccessive':
+            decodeACSuccessive(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeDCFirst':
+            decodeDCFirst(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeDCSuccessive':
+            decodeDCSuccessive(component, component.blocks[blockIndex]);
+        break;
+        case 'decodeBaseline':
+            decodeBaseline(component, component.blocks[blockIndex]);
+        break;
+    }
 }
 
 function decodeScan(data : Uint8Array, offset : i32, frame : Frame, components : FrameComponent, 
@@ -334,7 +392,7 @@ function decodeScan(data : Uint8Array, offset : i32, frame : Frame, components :
                     v = component.v;
                     for (j = 0; j < v; j++) {
                         for (k = 0; k < h; k++) {
-                            decodeMcu(component, decodeFn, mcu, j, k);
+                            decodeMcu(component, decodeFn, mcu, j, k, mcusPerLine);
                         }
                     }
                     component = component.prev;
