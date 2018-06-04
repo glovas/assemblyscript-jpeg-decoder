@@ -20,7 +20,7 @@ class JpegDecoder {
     private reader : ByteReader;
     private decodedData : RawImage;
 
-    private concatenateBytes(high : uint8, low : uint8) {
+    private concatenateBytes(high : uint8, low : uint8) : i32 {
         let ret : i32 = high;
         ret <<= 8;
         ret |= low;

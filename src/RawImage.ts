@@ -4,4 +4,3 @@ export class RawImage {
     height : i32;
     data : Uint8Array;
 }
-export default RawImage;

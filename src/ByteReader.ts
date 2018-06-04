@@ -7,22 +7,21 @@ export class ByteReader {
         this.data = bytes;
     }
 
-    skip(size : i32) : void {
-        if(this.carret + size >= this.data.length) {
+    skip(size: i32): void {
+        if (this.carret + size >= this.data.length) {
             unreachable();
         }
         this.carret += size;
     }
 
-    readBytes(buffer : Uint8Array, size : i32) : void {
-        if(this.carret + size >= this.data.length) {
+    readBytes(buffer: Uint8Array, size: i32): void {
+        if (this.carret + size >= this.data.length) {
             unreachable();
         }
-        for(let i: i32 = 0; i < size; i++) {
-            buffer[i] = this.data[this.carret+i];
+        for (let i: i32 = 0; i < size; i++) {
+            buffer[i] = this.data[this.carret + i];
         }
         this.carret += size;
     }
 
 }
-export default ByteReader;
