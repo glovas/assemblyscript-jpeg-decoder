@@ -4,7 +4,7 @@
   "description": "",
   "main": "Gruntfile.js",
   "dependencies": {
-    "assemblyscript": "^0.4.0",
+    "assemblyscript": "^0.3.0",
     "grunt": "^1.0.1",
     "grunt-contrib-watch": "^1.0.0",
     "grunt-exec": "^3.0.0"
@@ -17,6 +17,9 @@
     "mocha": "^4.0.1"
   },
   "scripts": {
+    "build": "npm run build:untouched && npm run build:optimized",
+    "build:untouched": "asc src/JpegDecoder.ts -t dist/JpegDecoder.untouched.wat -b dist/JpegDecoder.untouched.wasm --validate --sourceMap --measure",
+    "build:optimized": "asc src/JpegDecoder.ts -t dist/JpegDecoder.optimized.wat -b dist/JpegDecoder.optimized.wasm --validate --sourceMap --measure --optimize",
     "test": "./node_modules/.bin/mocha --reporter spec"
   },
   "author": "",
